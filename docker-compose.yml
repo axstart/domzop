@@ -1,0 +1,138 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: domzop
+      POSTGRES_PASSWORD: domzop
+      POSTGRES_DB: domzop
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U domzop -d domzop"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Discovery bot — CertStream CT log ingestion
+  discovery-bot:
+    build:
+      context: ./services/ingestion
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Poll + quality gate worker (existing)
+  poll-worker:
+    build:
+      context: ./services/workers
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Research lab bots — run in parallel, one consumer per queue
+  keyword-extractor-bot:
+    build:
+      context: ./services/bots
+    env_file: .env
+    environment:
+      BOT_NAME: keyword-extractor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  research-bot:
+    build:
+      context: ./services/bots
+    env_file: .env
+    environment:
+      BOT_NAME: research
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  availability-bot:
+    build:
+      context: ./services/bots
+    env_file: .env
+    environment:
+      BOT_NAME: availability
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scoring-bot:
+    build:
+      context: ./services/bots
+    env_file: .env
+    environment:
+      BOT_NAME: scoring
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  report-bot:
+    build:
+      context: ./services/bots
+    env_file: .env
+    environment:
+      BOT_NAME: report
+      REPORT_INTERVAL_MINUTES: 60
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ./admin
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
