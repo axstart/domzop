@@ -35,3 +35,8 @@ tmp/
 # Docker
 postgres_data/
 redis_data/
+
+# Vercel
+.vercel/
+admin/.vercel/
+
