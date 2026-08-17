@@ -207,7 +207,13 @@ class WorkerService:
     async def _handle_purchase(self, job: dict) -> None:
         candidate_id = job["candidate_id"]
         domain = job["domain"]
-        logger.info("Purchase queued for %s (auto=%s)", domain, self._settings.auto_purchase_enabled)
+        manual = bool(job.get("manual"))
+        logger.info(
+            "Purchase queued for %s (auto=%s manual=%s)",
+            domain,
+            self._settings.auto_purchase_enabled,
+            manual,
+        )
 
         # Registrar purchase integration stub — wire Namecheap domains.create in production
         async with await psycopg.AsyncConnection.connect(self._settings.database_url) as conn:
@@ -224,6 +230,19 @@ class WorkerService:
                         "Automated purchase not yet wired — use admin dashboard",
                     ),
                 )
+                if manual:
+                    await cur.execute(
+                        """
+                        UPDATE candidates
+                        SET status = 'purchased', purchased_at = COALESCE(purchased_at, NOW())
+                        WHERE id = %s
+                        """,
+                        (candidate_id,),
+                    )
+                    await cur.execute(
+                        "SELECT upsert_domain_asset_from_candidate(%s)",
+                        (candidate_id,),
+                    )
             await conn.commit()
 
     async def _discard(self, cur, candidate_id: str, reason: str) -> None:

@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { getPool, isDatabaseConfigured } from "@/lib/db";
-import { enqueuePurchase } from "@/lib/redis";
+import { upsertDomainAssetFromCandidate } from "@/lib/portfolio";
+import { enqueuePurchase, isRedisConfigured } from "@/lib/redis";
 
 function authorize(request: NextRequest): boolean {
   const secret = process.env.ADMIN_API_SECRET;
@@ -31,8 +32,32 @@ export async function POST(
     if (!rows.length) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    await enqueuePurchase(params.id, rows[0].com_domain);
-    return NextResponse.json({ queued: true });
+
+    await getPool().query(
+      `UPDATE candidates
+       SET status = 'purchased', purchased_at = COALESCE(purchased_at, NOW())
+       WHERE id = $1`,
+      [params.id],
+    );
+
+    let assetId: string | null = null;
+    try {
+      assetId = await upsertDomainAssetFromCandidate(params.id);
+    } catch (error) {
+      console.error("portfolio upsert skipped", error);
+    }
+
+    let queued = false;
+    if (isRedisConfigured()) {
+      try {
+        await enqueuePurchase(params.id, rows[0].com_domain);
+        queued = true;
+      } catch (error) {
+        console.error("purchase queue skipped", error);
+      }
+    }
+
+    return NextResponse.json({ purchased: true, queued, asset_id: assetId });
   }
 
   if (action === "discard") {
