@@ -92,7 +92,7 @@ export function CandidateTable() {
             ) : candidates.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-5 py-8 text-center text-gray-500">
-                  No candidates yet. Start the ingestion service to begin monitoring.
+                  No candidates yet. Start the research lab services to begin monitoring.
                 </td>
               </tr>
             ) : (

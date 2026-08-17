@@ -1,14 +1,13 @@
 # Domain Investing Research Lab (domzop)
 
-Automated domain investing pipeline that discovers deployments on Vercel, Netlify, and Render via Certificate Transparency logs, researches keywords and market signals, scores investment potential, and generates investor-facing reports.
+Domain investing research lab that monitors early-stage web projects, surfaces high-signal domain opportunities for investors, researches keywords and market signals, scores investment potential, and generates investor-facing reports.
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-  subgraph discovery [Discovery Layer]
-    CT[CertStream CT Logs] --> DB[discovery-bot]
-    DB --> PG[(PostgreSQL)]
+  subgraph discovery [Intake Layer]
+    DB[discovery-bot] --> PG[(PostgreSQL)]
     DB --> RQ[Redis Queues]
   end
 
@@ -34,7 +33,7 @@ flowchart TB
   end
 
   AB --> NC[Namecheap API]
-  PW --> SITES[Deploy URLs]
+  PW --> SITES[Project URLs]
   PW --> AI[OpenAI Vision]
 ```
 
@@ -42,13 +41,13 @@ flowchart TB
 
 | Bot | Queue | Input | Output |
 |-----|-------|-------|--------|
-| **discovery-bot** | `queue:poll`, `queue:extract_keywords` | CertStream SSL events | New candidates in DB |
-| **keyword-extractor-bot** | `queue:extract_keywords` → `queue:research` | Deploy URL + slug | Keywords in `keywords` table |
-| **research-bot** | `queue:research` → `queue:availability` | Keywords | Category, trends in `research_results` |
-| **availability-bot** | `queue:availability` → `queue:score` | Domain names | `.com`/TLD availability |
+| **discovery-bot** | `queue:poll`, `queue:extract_keywords` | New project signals | Candidates in DB |
+| **keyword-extractor-bot** | `queue:extract_keywords` ? `queue:research` | Project URL + slug | Keywords in `keywords` table |
+| **research-bot** | `queue:research` ? `queue:availability` | Keywords | Category, trends in `research_results` |
+| **availability-bot** | `queue:availability` ? `queue:score` | Domain names | `.com`/TLD availability |
 | **scoring-bot** | `queue:score` | All signals | `investment_score` on candidates |
 | **report-bot** | `queue:report` | Investor profiles | JSON + Markdown reports |
-| **poll-worker** | `queue:poll`, `queue:evaluate` | Deploy URLs | Poll snapshots, quality scores |
+| **poll-worker** | `queue:poll`, `queue:evaluate` | Project URLs | Poll snapshots, quality scores |
 
 ### Scoring model
 
@@ -56,13 +55,13 @@ Weighted multi-criteria scoring (inspired by cizher KhwarizmiEngine):
 
 | Axis | Weight | Signals |
 |------|--------|---------|
-| Deployment maturity | 25% | Poll count, DOM changes, quality score |
+| Project maturity | 25% | Poll count, DOM changes, quality score |
 | Keyword quality | 20% | Extracted keyword weights |
 | Availability | 20% | `.com` registrar check |
 | Research signals | 25% | Trend score, brandability, competition |
-| Platform signal | 10% | Vercel > Netlify > Render |
+| Hosting signal | 10% | Relative hosting maturity weight |
 
-Confidence bands: **strong** (≥75), **moderate** (≥55), **ambiguous** (<55).
+Confidence bands: **strong** (?75), **moderate** (?55), **ambiguous** (<55).
 
 ## Quick start
 
@@ -80,11 +79,11 @@ docker compose exec -T postgres psql -U domzop -d domzop < supabase/migrations/0
 ```
 
 This starts all services in parallel:
-- `postgres`, `redis` — data layer
-- `discovery-bot` — CertStream ingestion
-- `poll-worker` — site polling + AI quality gate
-- `keyword-extractor-bot`, `research-bot`, `availability-bot`, `scoring-bot`, `report-bot` — research lab pipeline
-- `admin` — dashboard on [http://localhost:3000](http://localhost:3000)
+- `postgres`, `redis` ? data layer
+- `discovery-bot` ? candidate intake
+- `poll-worker` ? site polling + AI quality gate
+- `keyword-extractor-bot`, `research-bot`, `availability-bot`, `scoring-bot`, `report-bot` ? research lab pipeline
+- `admin` ? dashboard on [http://localhost:3000](http://localhost:3000)
 
 ### Scale individual bots
 
@@ -96,17 +95,17 @@ docker compose up --scale keyword-extractor-bot=2 --scale research-bot=2
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TARGET_SUFFIXES` | `.vercel.app,...` | CT log filter suffixes |
+| `TARGET_SUFFIXES` | (see `.env.example`) | Host filters for candidate intake |
 | `POLL_INTERVAL_HOURS` | `24` | Time between site polls |
 | `QUALITY_SCORE_THRESHOLD` | `75` | Min score to trigger purchase |
 | `AUTO_PURCHASE_ENABLED` | `false` | Safety: manual buy via admin by default |
 | `NAMECHEAP_SANDBOX` | `true` | Use sandbox API until production-ready |
 | `REPORT_INTERVAL_MINUTES` | `60` | Auto-report generation interval |
-| `BOT_NAME` | — | Set per bot container (keyword-extractor, research, etc.) |
+| `BOT_NAME` | ? | Set per bot container (keyword-extractor, research, etc.) |
 
 ## Investor profiles
 
-Configure via **Admin → Investors** or directly in the `investor_profiles` table:
+Configure via **Admin ? Investors** or directly in the `investor_profiles` table:
 
 | Field | Purpose |
 |-------|---------|
@@ -116,26 +115,26 @@ Configure via **Admin → Investors** or directly in the `investor_profiles` tab
 | `budget_usd` | Max domain budget |
 | `excluded_keywords` | Skip candidates matching these terms |
 
-Reports are generated by `report-bot` (hourly) or on-demand from **Admin → Reports**.
+Reports are generated by `report-bot` (hourly) or on-demand from **Admin ? Reports**.
 
 ## Project layout
 
 ```
 domzop/
-├── admin/                      # Next.js dashboard
-│   └── src/app/
-│       ├── investors/          # Investor profile CRUD
-│       ├── reports/            # Report viewer + download
-│       ├── bots/               # Bot status + queue depths
-│       └── candidates/[id]/    # Keyword/research detail view
-├── services/
-│   ├── ingestion/              # discovery-bot (CertStream)
-│   ├── workers/                # poll-worker (poll + quality gate)
-│   └── bots/                   # Research lab bots (5 consumers)
-├── supabase/migrations/
-│   ├── 001_initial_schema.sql
-│   └── 002_research_lab_schema.sql
-└── docker-compose.yml
+??? admin/                      # Next.js dashboard
+?   ??? src/app/
+?       ??? investors/          # Investor profile CRUD
+?       ??? reports/            # Report viewer + download
+?       ??? bots/               # Bot status + queue depths
+?       ??? candidates/[id]/    # Keyword/research detail view
+??? services/
+?   ??? ingestion/              # discovery-bot (candidate intake)
+?   ??? workers/                # poll-worker (poll + quality gate)
+?   ??? bots/                   # Research lab bots (5 consumers)
+??? supabase/migrations/
+?   ??? 001_initial_schema.sql
+?   ??? 002_research_lab_schema.sql
+??? docker-compose.yml
 ```
 
 ## Integration with cizher (XEARCH)
@@ -150,13 +149,13 @@ domzop/
 | **API + offline fallback** (`quranTextService`) | Registrar check with graceful skip when unconfigured |
 | **Service worker PWA caching** | Available for future admin offline mode |
 
-Domain-specific backend (CertStream, Redis queues, Namecheap, PostgreSQL) was already in domzop and was extended, not copied from cizher.
+Domain-specific backend (intake, Redis queues, Namecheap, PostgreSQL) was already in domzop and was extended, not copied from cizher.
 
 ## State machine
 
 | Status | Meaning |
 |--------|---------|
-| `discovered` | Seen in CT log, pending first poll |
+| `discovered` | Newly ingested candidate, pending first poll |
 | `monitoring` | Active polling cycle |
 | `evaluated` | AI quality gate completed |
 | `purchased` | `.com` acquired via registrar |
@@ -190,19 +189,25 @@ pytest tests/
 
 | Component | Hosting |
 |-----------|---------|
-| Next.js admin (dmin/) | **Vercel** |
-| Python bots (services/) | Not on Vercel � Railway, Fly.io, or Render + Docker |
+| Next.js admin (`admin/`) | **Vercel** |
+| Python bots (`services/`) | Railway, Fly.io, or similar + Docker |
 | Postgres + Redis | Docker Compose locally, or managed DB/Redis for production |
 
-AUTO_PURCHASE_ENABLED stays alse until you explicitly enable purchases.
+`AUTO_PURCHASE_ENABLED` stays `false` until you explicitly enable purchases.
 
 ### Admin on Vercel
 
 1. Push this repo to GitHub.
-2. Import the project in Vercel with **Root Directory** = dmin.
-3. Set env vars (see dmin/.env.example): DATABASE_URL, REDIS_URL, ADMIN_API_SECRET, NEXT_PUBLIC_APP_URL.
+2. Import the project in Vercel with **Root Directory** = `admin`.
+3. Set env vars (see `admin/.env.example`): DATABASE_URL, REDIS_URL, ADMIN_API_SECRET, NEXT_PUBLIC_APP_URL.
 4. Deploy. Without DB/Redis the UI still loads with empty data.
 
-### Bots later (not Vercel)
+### Bots later
 
-Run docker compose up (or equivalent) for Postgres, Redis, discovery, workers, and research lab. Add Namecheap + OpenAI keys to the bot environment when ready.
+Run `docker compose up` (or equivalent) for Postgres, Redis, discovery, workers, and research lab. Add Namecheap + OpenAI keys to the bot environment when ready.
+
+---
+
+## OPERATOR NOTES (private)
+
+Internal ops only ? not marketing copy. Candidate intake filters host suffixes via `TARGET_SUFFIXES` (see `.env.example`). Ingestion lives under `services/ingestion/`. Do not restate intake method or host filters in public UI, README hero, or investor-facing materials.

@@ -13,8 +13,8 @@ export default function HomePage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Candidate Pipeline</h1>
         <p className="mt-2 max-w-2xl text-gray-400">
-          Discovery bots find deployments on Vercel, Netlify, and Render. Research bots score
-          investment potential and generate investor reports.
+          Surface high-signal domain opportunities for investors. Monitor project maturity,
+          run keyword research and availability checks, and generate investor reports.
         </p>
       </header>
 

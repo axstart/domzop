@@ -106,7 +106,7 @@ export default function BotsPage() {
           </table>
         </div>
         <p className="mt-4 text-xs text-gray-500">
-          Discovery runs via discovery-bot (CertStream). Polling runs via poll-worker.
+          Candidate intake runs via discovery-bot. Site polling runs via poll-worker.
         </p>
       </section>
     </main>

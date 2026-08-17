@@ -3,7 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Domain Investing Research Lab",
-  description: "Discovery, research, scoring, and investor reports for domain opportunities",
+  description:
+    "Domain investing research lab — monitor project maturity, keyword research, availability, and investor reports",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
