@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Domzop — Portfolio Manager",
+  title: "Domzop — Property Intelligence",
   description:
-    "Portfolio manager for domain and real estate holdings, with a research lab for domain discovery",
+    "Portfolio manager and property intelligence lab for domain and real estate holdings",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

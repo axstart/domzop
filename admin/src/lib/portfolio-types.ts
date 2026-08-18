@@ -32,6 +32,9 @@ export interface RealEstateHolding {
   hoa_fees: number | null;
   listing_url: string | null;
   image_url: string | null;
+  location_momentum: number | null;
+  condition_score: number | null;
+  market_notes: string | null;
 }
 
 export interface Valuation {
@@ -102,6 +105,9 @@ export interface CreateRealEstateInput {
   hoa_fees?: number | null;
   listing_url?: string | null;
   image_url?: string | null;
+  location_momentum?: number | null;
+  condition_score?: number | null;
+  market_notes?: string | null;
 }
 
 export interface CreateAssetInput {
@@ -116,4 +122,66 @@ export interface CreateAssetInput {
   candidate_id?: string | null;
   domain?: CreateDomainInput;
   real_estate?: CreateRealEstateInput;
+}
+
+export type CatalystCategory =
+  | "infra"
+  | "commercial"
+  | "residential"
+  | "zoning"
+  | "transit"
+  | "competing_supply"
+  | "amenities"
+  | "environmental"
+  | "policy"
+  | "other";
+
+export type CatalystStatus = "proposed" | "underway" | "completed" | "rumored";
+export type CatalystDirection = "positive" | "negative";
+export type CatalystHorizon = "near" | "mid" | "long";
+export type IntelligenceOutlook = "bullish" | "neutral" | "bearish";
+
+export interface PropertyCatalyst {
+  id: string;
+  asset_id: string;
+  name: string;
+  description: string | null;
+  category: CatalystCategory;
+  status: CatalystStatus;
+  impact_direction: CatalystDirection;
+  impact_weight: number;
+  confidence: number;
+  horizon: CatalystHorizon;
+  estimated_start: string | null;
+  estimated_completion: string | null;
+  source_url: string | null;
+  notes: string | null;
+  origin: string;
+  created_at: string;
+}
+
+export interface IntelligenceSnapshot {
+  id: string;
+  asset_id: string;
+  formula_version: string;
+  intelligence_score: number;
+  predicted_delta_pct: number;
+  predicted_value_1y: number | null;
+  predicted_value_3y: number | null;
+  predicted_value_5y: number | null;
+  outlook: IntelligenceOutlook;
+  narrative: string | null;
+  factors: unknown;
+  past_json: Record<string, unknown>;
+  present_json: Record<string, unknown>;
+  future_json: Record<string, unknown>;
+  generated_at: string;
+}
+
+export interface PropertyCard {
+  asset: PortfolioAsset;
+  intelligence_score: number | null;
+  outlook: IntelligenceOutlook | null;
+  predicted_delta_pct: number | null;
+  formula_version: string | null;
 }

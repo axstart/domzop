@@ -13,8 +13,8 @@ export default function HomePage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Candidate Pipeline</h1>
         <p className="mt-2 max-w-2xl text-gray-400">
-          Surface high-signal domain opportunities. Acquired names land in Portfolio alongside
-          real estate holdings.
+          Domain discovery for the portfolio. Real estate listings and formula intelligence live
+          under Properties; owned holdings live under Portfolio.
         </p>
       </header>
 

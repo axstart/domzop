@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Nav } from "@/components/Nav";
 import type { AssetStatus, AssetType, OccupancyType, PropertyType } from "@/lib/portfolio-types";
 
@@ -41,7 +41,7 @@ export default function NewHoldingPage() {
 
   const [shared, setShared] = useState({
     name: "",
-    status: "owned" as AssetStatus,
+    status: "watchlist" as AssetStatus,
     acquisition_cost: "",
     current_value: "",
     notes: "",
@@ -72,7 +72,17 @@ export default function NewHoldingPage() {
     annual_taxes: "",
     hoa_fees: "",
     listing_url: "",
+    location_momentum: "55",
+    condition_score: "60",
   });
+
+  useEffect(() => {
+    const type = new URLSearchParams(window.location.search).get("type");
+    if (type === "domain") {
+      setAssetType("domain");
+      setShared((s) => ({ ...s, status: "owned" }));
+    }
+  }, []);
 
   async function submit() {
     setSaving(true);
@@ -111,6 +121,8 @@ export default function NewHoldingPage() {
         annual_taxes: numOrNull(re.annual_taxes),
         hoa_fees: numOrNull(re.hoa_fees),
         listing_url: re.listing_url || null,
+        location_momentum: numOrNull(re.location_momentum) ?? 50,
+        condition_score: numOrNull(re.condition_score) ?? 60,
       };
     }
 
@@ -125,7 +137,9 @@ export default function NewHoldingPage() {
       setError(data.error ?? "Failed to add holding");
       return;
     }
-    router.push(`/portfolio/${data.asset.id}`);
+    router.push(
+      assetType === "real_estate" ? `/properties/${data.asset.id}` : `/portfolio/${data.asset.id}`,
+    );
   }
 
   return (
@@ -135,9 +149,10 @@ export default function NewHoldingPage() {
         ← Back to holdings
       </Link>
       <header className="mt-4 mb-8">
-        <h1 className="text-3xl font-bold">Add holding</h1>
+        <h1 className="text-3xl font-bold">Add holding or listing</h1>
         <p className="mt-2 text-gray-400">
-          Book a real estate property or a domain into the portfolio.
+          Real estate defaults to the watchlist (available / researching). Switch status to owned
+          when it is in the book. Domains can be booked the same way.
         </p>
       </header>
 
@@ -150,7 +165,13 @@ export default function NewHoldingPage() {
         ).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setAssetType(key)}
+            onClick={() => {
+              setAssetType(key);
+              setShared((s) => ({
+                ...s,
+                status: key === "domain" ? "owned" : "watchlist",
+              }));
+            }}
             className={`rounded-lg px-4 py-2 text-sm ${
               assetType === key ? "bg-accent text-white" : "bg-surface-border text-gray-400"
             }`}
@@ -308,6 +329,24 @@ export default function NewHoldingPage() {
                   className={`${inputClass} w-full`}
                   value={re.listing_url}
                   onChange={(e) => setRe({ ...re, listing_url: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Location momentum (0–100)</label>
+                <input
+                  type="number"
+                  className={`${inputClass} w-full`}
+                  value={re.location_momentum}
+                  onChange={(e) => setRe({ ...re, location_momentum: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Condition (0–100)</label>
+                <input
+                  type="number"
+                  className={`${inputClass} w-full`}
+                  value={re.condition_score}
+                  onChange={(e) => setRe({ ...re, condition_score: e.target.value })}
                 />
               </div>
             </div>

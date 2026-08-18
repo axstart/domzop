@@ -78,6 +78,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     annual_taxes: "",
     hoa_fees: "",
     listing_url: "",
+    location_momentum: "50",
+    condition_score: "60",
   });
 
   useEffect(() => {
@@ -117,6 +119,10 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             a.real_estate?.annual_taxes != null ? String(a.real_estate.annual_taxes) : "",
           hoa_fees: a.real_estate?.hoa_fees != null ? String(a.real_estate.hoa_fees) : "",
           listing_url: a.real_estate?.listing_url ?? "",
+          location_momentum:
+            a.real_estate?.location_momentum != null ? String(a.real_estate.location_momentum) : "50",
+          condition_score:
+            a.real_estate?.condition_score != null ? String(a.real_estate.condition_score) : "60",
         });
       });
   }, [params.id]);
@@ -157,6 +163,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
         annual_taxes: numOrNull(form.annual_taxes),
         hoa_fees: numOrNull(form.hoa_fees),
         listing_url: form.listing_url || null,
+        location_momentum: numOrNull(form.location_momentum),
+        condition_score: numOrNull(form.condition_score),
       };
     }
     const res = await fetch(`/api/portfolio/${params.id}`, {
@@ -234,6 +242,14 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
               className="mt-2 inline-block text-xs text-accent-muted hover:underline"
             >
               View research candidate
+            </Link>
+          )}
+          {asset.asset_type === "real_estate" && (
+            <Link
+              href={`/properties/${asset.id}`}
+              className="mt-2 ml-3 inline-block text-xs text-accent-muted hover:underline"
+            >
+              Open intelligence
             </Link>
           )}
         </div>
@@ -442,6 +458,24 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
                 className={`${inputClass} w-full`}
                 value={form.listing_url}
                 onChange={(e) => setForm({ ...form, listing_url: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Location momentum</label>
+              <input
+                type="number"
+                className={`${inputClass} w-full`}
+                value={form.location_momentum}
+                onChange={(e) => setForm({ ...form, location_momentum: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Condition</label>
+              <input
+                type="number"
+                className={`${inputClass} w-full`}
+                value={form.condition_score}
+                onChange={(e) => setForm({ ...form, condition_score: e.target.value })}
               />
             </div>
           </div>

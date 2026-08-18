@@ -79,8 +79,8 @@ export default function PortfolioPage() {
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">Holdings</h1>
           <p className="mt-2 max-w-2xl text-gray-400">
-            Track domains and real estate in one book: cost basis, marks, status, and simple
-            performance.
+            Track owned domains and real estate: cost basis, marks, and simple performance.
+            Available listings and formula intelligence live under Properties.
           </p>
         </div>
         <Link
@@ -216,6 +216,16 @@ export default function PortfolioPage() {
                         >
                           {a.name}
                         </Link>
+                        {a.asset_type === "real_estate" && (
+                          <p className="mt-0.5">
+                            <Link
+                              href={`/properties/${a.id}`}
+                              className="text-xs text-accent-muted hover:underline"
+                            >
+                              Intelligence
+                            </Link>
+                          </p>
+                        )}
                         {a.candidate_id && (
                           <p className="mt-0.5 text-xs text-gray-500">Linked from research lab</p>
                         )}
