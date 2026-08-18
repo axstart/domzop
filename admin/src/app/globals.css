@@ -48,4 +48,13 @@ body {
       linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
     background-size: 24px 24px;
   }
+
+  .field {
+    @apply rounded-lg border border-surface-border bg-black/40 px-3 py-2 text-sm text-gray-100 outline-none focus:border-neon-cyan;
+  }
+}
+
+.leaflet-container {
+  background: #0a0f18;
+  font: inherit;
 }

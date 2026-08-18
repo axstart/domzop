@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorized, unauthorized } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/db";
+import { demoIntelligence, getDemoProperty, isDemoId } from "@/lib/demo-properties";
 import { getIntelligence } from "@/lib/intelligence";
 
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    if (isDemoId(params.id)) {
+      const card = getDemoProperty(params.id);
+      if (!card) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(demoIntelligence(card));
+    }
     if (!isDatabaseConfigured()) {
       return NextResponse.json({ error: "DATABASE_URL is not configured" }, { status: 503 });
     }
@@ -29,6 +35,11 @@ export async function POST(
 ) {
   if (!isAuthorized(request)) return unauthorized();
   try {
+    if (isDemoId(params.id)) {
+      const card = getDemoProperty(params.id);
+      if (!card) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(demoIntelligence(card));
+    }
     if (!isDatabaseConfigured()) {
       return NextResponse.json({ error: "DATABASE_URL is not configured" }, { status: 503 });
     }

@@ -35,6 +35,8 @@ export interface RealEstateHolding {
   location_momentum: number | null;
   condition_score: number | null;
   market_notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface Valuation {
@@ -108,6 +110,8 @@ export interface CreateRealEstateInput {
   location_momentum?: number | null;
   condition_score?: number | null;
   market_notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface CreateAssetInput {

@@ -1,193 +1,236 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { Nav } from "@/components/Nav";
-import { ChartCard, HashLookupScore, MetricPills } from "@/components/charts";
-import { formatMoney, plClass } from "@/lib/money";
-import type { IntelligenceOutlook, PropertyCard } from "@/lib/portfolio-types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { AxPanel } from "@/components/AxPanel";
+import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { citiesForCountry, countriesList } from "@/lib/geo";
+import { formatMoney } from "@/lib/money";
+import type { PropertyCard } from "@/lib/portfolio-types";
 
-function outlookTone(outlook: IntelligenceOutlook | null): "ok" | "warn" | "bad" | "info" {
-  if (outlook === "bullish") return "ok";
-  if (outlook === "bearish") return "bad";
-  return "warn";
-}
+const PropertyMap = dynamic(
+  () => import("@/components/PropertyMap").then((m) => m.PropertyMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[360px] items-center justify-center text-sm text-gray-500">
+        Loading map…
+      </div>
+    ),
+  },
+);
 
-export default function PropertiesPage() {
+export default function PropertiesModulePage() {
+  const [country, setCountry] = useState("United States");
+  const [city, setCity] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [view, setView] = useState<"gallery" | "map">("gallery");
   const [cards, setCards] = useState<PropertyCard[]>([]);
-  const [includeOwned, setIncludeOwned] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<string>("");
+
+  const cities = useMemo(() => citiesForCountry(country), [country]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const qs = includeOwned ? "?include_owned=1" : "";
-    const res = await fetch(`/api/properties${qs}`);
+    const params = new URLSearchParams();
+    if (country) params.set("country", country);
+    if (city) params.set("city", city);
+    if (minPrice) params.set("min_price", minPrice);
+    if (maxPrice) params.set("max_price", maxPrice);
+    params.set("include_owned", "1");
+    const res = await fetch(`/api/properties?${params}`);
     const data = await res.json();
-    setCards(data.properties ?? []);
+    const list: PropertyCard[] = data.properties ?? [];
+    setCards(list);
+    setSource(data.source ?? "");
+    setSelectedId((prev) => (prev && list.some((c) => c.asset.id === prev) ? prev : list[0]?.asset.id ?? null));
     setLoading(false);
-  }, [includeOwned]);
+  }, [country, city, minPrice, maxPrice]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const avgScore =
-    cards.length === 0
-      ? null
-      : cards.reduce((s, c) => s + (c.intelligence_score ?? 0), 0) /
-        cards.filter((c) => c.intelligence_score != null).length;
+  useEffect(() => {
+    setCity("");
+  }, [country]);
+
+  const selected = cards.find((c) => c.asset.id === selectedId) ?? null;
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <main className="mx-auto max-w-[1600px] px-4 py-6 lg:px-6">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-widest text-neon-gold">
-            Property intelligence lab
+            Property module
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Available properties</h1>
-          <p className="mt-2 max-w-2xl text-gray-400">
-            Browse listings and open charted intelligence — past marks, present snapshot, and a
-            Domzop Formula path with related projects that may lift or pressure value.
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">Explore listings</h1>
+          <p className="mt-2 max-w-2xl text-sm text-gray-400">
+            Pick a country and city, filter by value, browse photos, open the map, and read Ax
+            Panel intelligence for the selected property.
           </p>
         </div>
         <Link
           href="/portfolio/new?type=real_estate"
-          className="rounded-lg bg-neon-cyan/20 px-4 py-2 text-sm text-neon-cyan shadow-neon hover:bg-neon-cyan/30"
+          className="rounded-lg bg-neon-cyan/20 px-4 py-2 text-sm text-neon-cyan shadow-neon"
         >
           Add listing
         </Link>
       </header>
 
-      <Nav />
+      <ModuleSwitcher />
 
-      <section className="mb-8 grid gap-4 lg:grid-cols-3">
-        <ChartCard
-          index={1}
-          title="Lab pulse"
-          accent="green"
-          caption="Hash-lookup style score — one lit cell in the row for the board average."
-        >
-          <HashLookupScore score={Number.isFinite(avgScore) ? avgScore! : null} label="Avg score" />
-        </ChartCard>
-        <ChartCard
-          index={2}
-          title="Board status"
-          accent="cyan"
-          caption="What you can act on right now."
-          className="lg:col-span-2"
-        >
-          <MetricPills
-            items={[
-              { label: "LISTINGS", value: String(cards.length), tone: "info" },
-              {
-                label: "VIEW",
-                value: includeOwned ? "incl. owned" : "watching",
-                tone: "warn",
-              },
-              {
-                label: "BULLISH",
-                value: String(cards.filter((c) => c.outlook === "bullish").length),
-                tone: "ok",
-              },
-              {
-                label: "BEARISH",
-                value: String(cards.filter((c) => c.outlook === "bearish").length),
-                tone: "bad",
-              },
-            ]}
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-surface-border bg-surface-raised/80 p-4">
+        <Field label="Country">
+          <select
+            className="field"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+          >
+            {countriesList().map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="City">
+          <select className="field" value={city} onChange={(e) => setCity(e.target.value)}>
+            <option value="">All cities</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Min value">
+          <input
+            type="number"
+            className="field w-32"
+            placeholder="0"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
           />
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              onClick={() => setIncludeOwned(false)}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                !includeOwned
-                  ? "bg-neon-cyan/20 text-neon-cyan"
-                  : "text-gray-400 hover:bg-surface-border"
-              }`}
-            >
-              Available / watching
-            </button>
-            <button
-              onClick={() => setIncludeOwned(true)}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                includeOwned
-                  ? "bg-neon-cyan/20 text-neon-cyan"
-                  : "text-gray-400 hover:bg-surface-border"
-              }`}
-            >
-              Include owned
-            </button>
-          </div>
-        </ChartCard>
-      </section>
+        </Field>
+        <Field label="Max value">
+          <input
+            type="number"
+            className="field w-32"
+            placeholder="Any"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+          />
+        </Field>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setView("gallery")}
+            className={`rounded-lg px-3 py-2 text-sm ${
+              view === "gallery" ? "bg-neon-cyan/20 text-neon-cyan" : "text-gray-400"
+            }`}
+          >
+            Gallery
+          </button>
+          <button
+            onClick={() => setView("map")}
+            className={`rounded-lg px-3 py-2 text-sm ${
+              view === "map" ? "bg-neon-cyan/20 text-neon-cyan" : "text-gray-400"
+            }`}
+          >
+            Map
+          </button>
+        </div>
+        {source === "demo" && (
+          <p className="text-xs text-neon-gold">Showing sample listings until DB is connected.</p>
+        )}
+      </div>
 
-      {loading ? (
-        <p className="text-gray-500">Loading listings…</p>
-      ) : cards.length === 0 ? (
-        <div className="chart-panel px-6 py-12 text-center text-gray-500">
-          No available properties yet. Add a watchlist listing to start the intelligence lab.
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((card, i) => {
-            const re = card.asset.real_estate;
-            const loc = [re?.city, re?.region].filter(Boolean).join(", ");
-            return (
-              <Link
-                key={card.asset.id}
-                href={`/properties/${card.asset.id}`}
-                className="chart-panel group transition hover:border-neon-cyan/50 hover:shadow-neon"
-              >
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold text-neon-gold">
-                      {i + 1}. {re?.property_type ?? "property"}
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold group-hover:text-neon-cyan">
-                      {card.asset.name}
-                    </h2>
-                    {loc && <p className="mt-1 text-sm text-gray-400">{loc}</p>}
-                  </div>
-                  <HashLookupScore
-                    score={card.intelligence_score}
-                    label="Score"
-                    cells={7}
-                    compact
-                  />
-                </div>
-                <MetricPills
-                  items={[
-                    {
-                      label: "MARK",
-                      value: formatMoney(
-                        card.asset.current_value ?? card.asset.acquisition_cost,
-                        card.asset.currency,
-                      ),
-                      tone: "info",
-                    },
-                    {
-                      label: "OUTLOOK",
-                      value: card.outlook ?? "—",
-                      tone: outlookTone(card.outlook),
-                    },
-                    {
-                      label: "1Y",
-                      value:
-                        card.predicted_delta_pct == null
-                          ? "—"
-                          : `${card.predicted_delta_pct > 0 ? "+" : ""}${card.predicted_delta_pct}%`,
-                      tone: (card.predicted_delta_pct ?? 0) >= 0 ? "ok" : "bad",
-                    },
-                  ]}
-                />
-                <p className={`mt-3 text-xs ${plClass(card.predicted_delta_pct)}`}>
-                  Open charts → past · present · future
-                </p>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
+        <section className="min-h-[520px]">
+          {loading ? (
+            <p className="text-gray-500">Loading properties…</p>
+          ) : cards.length === 0 ? (
+            <div className="rounded-2xl border border-surface-border bg-surface-raised p-10 text-center text-gray-500">
+              No listings in this range. Try another city or widen the value filter.
+            </div>
+          ) : view === "map" ? (
+            <PropertyMap
+              properties={cards}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {cards.map((card) => {
+                const re = card.asset.real_estate;
+                const active = card.asset.id === selectedId;
+                return (
+                  <button
+                    key={card.asset.id}
+                    type="button"
+                    onClick={() => setSelectedId(card.asset.id)}
+                    className={`overflow-hidden rounded-2xl border text-left transition ${
+                      active
+                        ? "border-neon-cyan shadow-neon"
+                        : "border-surface-border hover:border-neon-cyan/40"
+                    }`}
+                  >
+                    <div className="relative aspect-[16/10] bg-black/50">
+                      {re?.image_url ? (
+                        <Image
+                          src={re.image_url}
+                          alt={card.asset.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width:768px) 100vw, 40vw"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-gray-600">
+                          No photo
+                        </div>
+                      )}
+                      <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 text-sm font-semibold text-neon-cyan">
+                        {formatMoney(
+                          card.asset.current_value ?? card.asset.acquisition_cost,
+                          card.asset.currency,
+                        )}
+                      </span>
+                    </div>
+                    <div className="bg-surface-raised p-4">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-500">
+                        {re?.property_type} · {re?.city}
+                      </p>
+                      <h2 className="mt-1 font-semibold">{card.asset.name}</h2>
+                      <p className="mt-1 truncate text-xs text-gray-400">{re?.address}</p>
+                      <p className="mt-2 text-xs text-neon-gold">
+                        Score {card.intelligence_score != null ? Math.round(card.intelligence_score) : "—"} ·{" "}
+                        <span className="capitalize">{card.outlook ?? "—"}</span>
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <AxPanel selected={selected} />
+      </div>
     </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-xs">
+      <span className="mb-1 block uppercase tracking-wide text-gray-500">{label}</span>
+      {children}
+    </label>
   );
 }

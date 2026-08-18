@@ -40,7 +40,7 @@ const ASSET_SELECT = `
     r.address, r.city, r.region, r.country, r.postal_code, r.property_type,
     r.bedrooms, r.bathrooms, r.square_feet, r.square_meters, r.lot_size, r.year_built,
     r.occupancy, r.monthly_rent, r.annual_taxes, r.hoa_fees, r.listing_url, r.image_url,
-    r.location_momentum, r.condition_score, r.market_notes
+    r.location_momentum, r.condition_score, r.market_notes, r.latitude, r.longitude
   FROM assets a
   LEFT JOIN domain_holdings d ON d.asset_id = a.id
   LEFT JOIN real_estate_holdings r ON r.asset_id = a.id
@@ -110,6 +110,8 @@ function mapAsset(row: Record<string, unknown>): PortfolioAsset {
             location_momentum: toNumber(row.location_momentum) ?? 50,
             condition_score: toNumber(row.condition_score) ?? 60,
             market_notes: (row.market_notes as string) ?? null,
+            latitude: toNumber(row.latitude),
+            longitude: toNumber(row.longitude),
           }
         : null,
   };
@@ -301,9 +303,9 @@ export async function createAsset(input: CreateAssetInput): Promise<PortfolioAss
            asset_id, address, city, region, country, postal_code, property_type,
            bedrooms, bathrooms, square_feet, square_meters, lot_size, year_built,
            occupancy, monthly_rent, annual_taxes, hoa_fees, listing_url, image_url,
-           location_momentum, condition_score, market_notes
+           location_momentum, condition_score, market_notes, latitude, longitude
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
         [
           id,
           re.address.trim(),
@@ -327,6 +329,8 @@ export async function createAsset(input: CreateAssetInput): Promise<PortfolioAss
           re.location_momentum ?? 50,
           re.condition_score ?? 60,
           re.market_notes?.trim() || null,
+          re.latitude ?? null,
+          re.longitude ?? null,
         ],
       );
     }
@@ -394,6 +398,8 @@ const RE_PATCH_FIELDS = new Set([
   "location_momentum",
   "condition_score",
   "market_notes",
+  "latitude",
+  "longitude",
 ]);
 
 export async function updateAsset(

@@ -181,6 +181,10 @@ function mapSnapshot(row: Record<string, unknown>): IntelligenceSnapshot {
 export async function listAvailableProperties(opts?: {
   includeOwned?: boolean;
   status?: string;
+  country?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
 }): Promise<PropertyCard[]> {
   if (!isDatabaseConfigured()) return [];
   const statuses = new Set(
@@ -190,9 +194,27 @@ export async function listAvailableProperties(opts?: {
         ? ["watchlist", "listed", "owned"]
         : ["watchlist", "listed"],
   );
-  const assets = (await listAssets({ asset_type: "real_estate" })).filter((a) =>
+  let assets = (await listAssets({ asset_type: "real_estate" })).filter((a) =>
     statuses.has(a.status),
   );
+
+  if (opts?.country) {
+    const c = opts.country.toLowerCase();
+    assets = assets.filter((a) => a.real_estate?.country?.toLowerCase() === c);
+  }
+  if (opts?.city) {
+    const city = opts.city.toLowerCase();
+    assets = assets.filter((a) => a.real_estate?.city?.toLowerCase() === city);
+  }
+  if (opts?.minPrice != null || opts?.maxPrice != null) {
+    assets = assets.filter((a) => {
+      const price = a.current_value ?? a.acquisition_cost ?? 0;
+      if (opts.minPrice != null && price < opts.minPrice) return false;
+      if (opts.maxPrice != null && price > opts.maxPrice) return false;
+      return true;
+    });
+  }
+
   if (!assets.length) return [];
 
   const ids = assets.map((a) => a.id);
