@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AxPanel } from "@/components/AxPanel";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { SpringCard, SpringChip } from "@/components/Spring";
 import { citiesForCountry, countriesList } from "@/lib/geo";
 import { formatMoney } from "@/lib/money";
 import type { PropertyCard } from "@/lib/portfolio-types";
@@ -128,22 +129,24 @@ export default function PropertiesModulePage() {
           />
         </Field>
         <div className="flex gap-2">
-          <button
+          <SpringChip
+            active={view === "gallery"}
             onClick={() => setView("gallery")}
             className={`rounded-lg px-3 py-2 text-sm ${
               view === "gallery" ? "bg-neon-cyan/20 text-neon-cyan" : "text-gray-400"
             }`}
           >
             Gallery
-          </button>
-          <button
+          </SpringChip>
+          <SpringChip
+            active={view === "map"}
             onClick={() => setView("map")}
             className={`rounded-lg px-3 py-2 text-sm ${
               view === "map" ? "bg-neon-cyan/20 text-neon-cyan" : "text-gray-400"
             }`}
           >
             Map
-          </button>
+          </SpringChip>
         </div>
         {source === "demo" && (
           <p className="text-xs text-neon-gold">Showing sample listings until DB is connected.</p>
@@ -170,11 +173,11 @@ export default function PropertiesModulePage() {
                 const re = card.asset.real_estate;
                 const active = card.asset.id === selectedId;
                 return (
-                  <button
+                  <SpringCard
                     key={card.asset.id}
-                    type="button"
+                    active={active}
                     onClick={() => setSelectedId(card.asset.id)}
-                    className={`overflow-hidden rounded-2xl border text-left transition ${
+                    className={`overflow-hidden rounded-2xl border text-left ${
                       active
                         ? "border-neon-cyan shadow-neon"
                         : "border-surface-border hover:border-neon-cyan/40"
@@ -213,7 +216,7 @@ export default function PropertiesModulePage() {
                         <span className="capitalize">{card.outlook ?? "—"}</span>
                       </p>
                     </div>
-                  </button>
+                  </SpringCard>
                 );
               })}
             </div>

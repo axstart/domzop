@@ -1,30 +1,86 @@
+import { buildDeepPropertyIntelligence } from "@/lib/deep-intelligence";
+import { resolveCoords } from "@/lib/geo";
 import type {
   IntelligenceOutlook,
   PortfolioAsset,
   PropertyCard,
   PropertyCatalyst,
 } from "@/lib/portfolio-types";
-import { resolveCoords } from "@/lib/geo";
 
-function asset(
-  id: string,
-  name: string,
-  country: string,
-  city: string,
-  address: string,
-  value: number,
-  image: string,
-  type: "residential" | "commercial" | "land" | "mixed",
-  extras: Partial<NonNullable<PortfolioAsset["real_estate"]>> = {},
-): PortfolioAsset {
-  const coords = resolveCoords(country, city);
+const IMAGES = [
+  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80",
+  "https://images.unsplash.com/photo-1512453979798-5ea933d7d5c5?w=800&q=80",
+  "https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=800&q=80",
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+  "https://images.unsplash.com/photo-1600047509807-ba8f99d2cd00?w=800&q=80",
+  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80",
+  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
+  "https://images.unsplash.com/photo-1600573472592-401b489a3cdc?w=800&q=80",
+  "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800&q=80",
+];
+
+type Spec = {
+  id: string;
+  name: string;
+  country: string;
+  city: string;
+  address: string;
+  value: number;
+  type: "residential" | "commercial" | "land" | "mixed";
+  score: number;
+  outlook: IntelligenceOutlook;
+  delta: number;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number;
+  momentum?: number;
+};
+
+const SPECS: Spec[] = [
+  { id: "demo-ny-1", name: "Hudson River Loft", country: "United States", city: "New York", address: "220 Riverside Blvd", value: 1850000, type: "residential", score: 81, outlook: "bullish", delta: 6.4, beds: 2, baths: 2, sqft: 1400, momentum: 78 },
+  { id: "demo-ny-2", name: "SoHo Cast-Iron Studio", country: "United States", city: "New York", address: "41 Greene St", value: 2400000, type: "residential", score: 79, outlook: "bullish", delta: 5.8, beds: 1, baths: 1, sqft: 1100, momentum: 80 },
+  { id: "demo-ny-3", name: "Midtown Flex Office", country: "United States", city: "New York", address: "350 5th Ave", value: 6200000, type: "commercial", score: 61, outlook: "neutral", delta: 1.4, beds: null, baths: 6, sqft: 12000, momentum: 55 },
+  { id: "demo-mia-1", name: "Brickell Waterfront Condo", country: "United States", city: "Miami", address: "801 Brickell Bay Dr", value: 920000, type: "residential", score: 76, outlook: "bullish", delta: 5.1, beds: 2, baths: 2, sqft: 1250, momentum: 74 },
+  { id: "demo-mia-2", name: "Wynwood Creative Warehouse", country: "United States", city: "Miami", address: "2300 NW 2nd Ave", value: 3100000, type: "mixed", score: 73, outlook: "bullish", delta: 4.6, beds: null, baths: 4, sqft: 9000, momentum: 72 },
+  { id: "demo-la-1", name: "Silver Lake Hills Residence", country: "United States", city: "Los Angeles", address: "2211 Micheltorena St", value: 1680000, type: "residential", score: 74, outlook: "bullish", delta: 4.2, beds: 3, baths: 3, sqft: 2100, momentum: 70 },
+  { id: "demo-la-2", name: "Santa Monica Retail Strip", country: "United States", city: "Los Angeles", address: "1400 3rd Street Promenade", value: 4500000, type: "commercial", score: 58, outlook: "bearish", delta: -1.2, beds: null, baths: 4, sqft: 6500, momentum: 48 },
+  { id: "demo-aus-1", name: "East Austin Mixed Use", country: "United States", city: "Austin", address: "1400 E 6th St", value: 2100000, type: "mixed", score: 72, outlook: "neutral", delta: 3.2, beds: null, baths: null, sqft: 6200, momentum: 71 },
+  { id: "demo-aus-2", name: "Domain Northside Flat", country: "United States", city: "Austin", address: "11801 Domain Blvd", value: 540000, type: "residential", score: 69, outlook: "neutral", delta: 2.8, beds: 2, baths: 2, sqft: 980, momentum: 64 },
+  { id: "demo-chi-1", name: "River North Condo", country: "United States", city: "Chicago", address: "600 N Fairbanks Ct", value: 710000, type: "residential", score: 66, outlook: "neutral", delta: 2.1, beds: 2, baths: 2, sqft: 1150, momentum: 60 },
+  { id: "demo-dxb-1", name: "Marina Gate Tower", country: "United Arab Emirates", city: "Dubai", address: "Dubai Marina Walk", value: 1450000, type: "residential", score: 84, outlook: "bullish", delta: 7.8, beds: 3, baths: 3, sqft: 2100, momentum: 80 },
+  { id: "demo-dxb-2", name: "Business Bay Office Floor", country: "United Arab Emirates", city: "Dubai", address: "Bay Square Building 7", value: 2800000, type: "commercial", score: 71, outlook: "bullish", delta: 4.9, beds: null, baths: 8, sqft: 8500, momentum: 68 },
+  { id: "demo-auh-1", name: "Al Reem Island Apartment", country: "United Arab Emirates", city: "Abu Dhabi", address: "Gate Tower 1", value: 620000, type: "residential", score: 68, outlook: "neutral", delta: 3.5, beds: 2, baths: 2, sqft: 1300, momentum: 63 },
+  { id: "demo-lon-1", name: "Shoreditch Workspace", country: "United Kingdom", city: "London", address: "48 Great Eastern St", value: 2750000, type: "commercial", score: 68, outlook: "neutral", delta: 2.4, beds: null, baths: 4, sqft: 4800, momentum: 69 },
+  { id: "demo-lon-2", name: "Canary Wharf Flat", country: "United Kingdom", city: "London", address: "1 Canada Square", value: 890000, type: "residential", score: 63, outlook: "neutral", delta: 1.8, beds: 1, baths: 1, sqft: 720, momentum: 57 },
+  { id: "demo-man-1", name: "Northern Quarter Loft", country: "United Kingdom", city: "Manchester", address: "22 Tib St", value: 420000, type: "residential", score: 70, outlook: "bullish", delta: 4.4, beds: 2, baths: 1, sqft: 900, momentum: 67 },
+  { id: "demo-khi-1", name: "Clifton Seaview", country: "Pakistan", city: "Karachi", address: "Block 5, Clifton", value: 420000, type: "residential", score: 64, outlook: "neutral", delta: 4.0, beds: 4, baths: 4, sqft: 3200, momentum: 58 },
+  { id: "demo-khi-2", name: "DHA Phase 8 Commercial Plot", country: "Pakistan", city: "Karachi", address: "Khayaban-e-Ittehad", value: 890000, type: "land", score: 59, outlook: "neutral", delta: 2.0, beds: null, baths: null, sqft: 4500, momentum: 54 },
+  { id: "demo-lhe-1", name: "DHA Phase 6 Villa", country: "Pakistan", city: "Lahore", address: "Street 12, DHA Phase 6", value: 380000, type: "residential", score: 70, outlook: "bullish", delta: 5.5, beds: 5, baths: 5, sqft: 4500, momentum: 61 },
+  { id: "demo-lhe-2", name: "Gulberg Boutique Offices", country: "Pakistan", city: "Lahore", address: "Main Boulevard Gulberg", value: 510000, type: "commercial", score: 65, outlook: "neutral", delta: 3.1, beds: null, baths: 5, sqft: 5200, momentum: 59 },
+  { id: "demo-isb-1", name: "F-7 Diplomatic Enclave Flat", country: "Pakistan", city: "Islamabad", address: "Street 42, F-7/1", value: 290000, type: "residential", score: 72, outlook: "bullish", delta: 5.0, beds: 3, baths: 3, sqft: 2400, momentum: 66 },
+  { id: "demo-tor-1", name: "King West Loft", country: "Canada", city: "Toronto", address: "560 King St W", value: 980000, type: "residential", score: 67, outlook: "neutral", delta: 2.9, beds: 1, baths: 1, sqft: 780, momentum: 66 },
+  { id: "demo-tor-2", name: "Yorkville Boutique Hotel Site", country: "Canada", city: "Toronto", address: "88 Avenue Rd", value: 7800000, type: "mixed", score: 60, outlook: "bearish", delta: -0.8, beds: null, baths: null, sqft: 18000, momentum: 52 },
+  { id: "demo-van-1", name: "Yaletown Sky Residence", country: "Canada", city: "Vancouver", address: "1200 Pacific Blvd", value: 1250000, type: "residential", score: 71, outlook: "bullish", delta: 3.8, beds: 2, baths: 2, sqft: 1050, momentum: 69 },
+  { id: "demo-mum-1", name: "Bandra West Sea-Facing", country: "India", city: "Mumbai", address: "Pali Hill", value: 980000, type: "residential", score: 75, outlook: "bullish", delta: 6.1, beds: 3, baths: 3, sqft: 1800, momentum: 73 },
+  { id: "demo-del-1", name: "Golf Course Road Tower", country: "India", city: "Delhi", address: "Sector 54, Gurgaon", value: 640000, type: "residential", score: 69, outlook: "neutral", delta: 3.6, beds: 3, baths: 3, sqft: 1950, momentum: 65 },
+  { id: "demo-sg-1", name: "Marina Bay Serviced Suite", country: "Singapore", city: "Singapore", address: "6 Raffles Blvd", value: 2100000, type: "residential", score: 77, outlook: "bullish", delta: 4.0, beds: 1, baths: 1, sqft: 680, momentum: 76 },
+  { id: "demo-sg-2", name: "Changi Logistics Bay", country: "Singapore", city: "Singapore", address: "Airport Logistics Park", value: 5600000, type: "commercial", score: 74, outlook: "bullish", delta: 5.2, beds: null, baths: 4, sqft: 22000, momentum: 72 },
+  { id: "demo-ryd-1", name: "Diplomatic Quarter Villa", country: "Saudi Arabia", city: "Riyadh", address: "Diplomatic Quarter", value: 1550000, type: "residential", score: 78, outlook: "bullish", delta: 6.8, beds: 5, baths: 6, sqft: 5200, momentum: 75 },
+  { id: "demo-jed-1", name: "Corniche Mixed Block", country: "Saudi Arabia", city: "Jeddah", address: "Corniche Rd", value: 2200000, type: "mixed", score: 70, outlook: "bullish", delta: 5.0, beds: null, baths: 8, sqft: 11000, momentum: 67 },
+];
+
+function toAsset(spec: Spec, imageIndex: number): PortfolioAsset {
+  const coords = resolveCoords(spec.country, spec.city);
   return {
-    id,
+    id: spec.id,
     asset_type: "real_estate",
-    name,
+    name: spec.name,
     status: "watchlist",
-    acquisition_cost: value * 0.92,
-    current_value: value,
+    acquisition_cost: Math.round(spec.value * 0.92),
+    current_value: spec.value,
     currency: "USD",
     acquired_at: null,
     sold_at: null,
@@ -34,182 +90,40 @@ function asset(
     updated_at: new Date().toISOString(),
     domain: null,
     real_estate: {
-      address,
-      city,
+      address: spec.address,
+      city: spec.city,
       region: null,
-      country,
+      country: spec.country,
       postal_code: null,
-      property_type: type,
-      bedrooms: extras.bedrooms ?? 3,
-      bathrooms: extras.bathrooms ?? 2,
-      square_feet: extras.square_feet ?? 1800,
+      property_type: spec.type,
+      bedrooms: spec.beds ?? null,
+      bathrooms: spec.baths ?? null,
+      square_feet: spec.sqft ?? 1800,
       square_meters: null,
       lot_size: null,
-      year_built: extras.year_built ?? 2018,
-      occupancy: extras.occupancy ?? "vacant",
-      monthly_rent: extras.monthly_rent ?? Math.round(value * 0.004),
-      annual_taxes: extras.annual_taxes ?? Math.round(value * 0.01),
+      year_built: 2016 + (imageIndex % 8),
+      occupancy: spec.type === "residential" ? "vacant" : "rented",
+      monthly_rent: Math.round(spec.value * 0.004),
+      annual_taxes: Math.round(spec.value * 0.01),
       hoa_fees: null,
       listing_url: null,
-      image_url: image,
-      location_momentum: extras.location_momentum ?? 62,
-      condition_score: extras.condition_score ?? 70,
-      market_notes: extras.market_notes ?? null,
+      image_url: IMAGES[imageIndex % IMAGES.length],
+      location_momentum: spec.momentum ?? 60,
+      condition_score: 65 + (imageIndex % 20),
+      market_notes: null,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
     },
   };
 }
 
-const IMAGES = {
-  ny: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80",
-  miami: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80",
-  dubai: "https://images.unsplash.com/photo-1512453979798-5ea933d7d5c5?w=800&q=80",
-  london: "https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=800&q=80",
-  karachi: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80",
-  lahore: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
-  austin: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cd00?w=800&q=80",
-  toronto: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
-};
-
-export const DEMO_PROPERTIES: PropertyCard[] = [
-  {
-    asset: asset(
-      "demo-ny-1",
-      "Hudson River Loft",
-      "United States",
-      "New York",
-      "220 Riverside Blvd",
-      1850000,
-      IMAGES.ny,
-      "residential",
-      { bedrooms: 2, bathrooms: 2, square_feet: 1400, location_momentum: 78 },
-    ),
-    intelligence_score: 81,
-    outlook: "bullish",
-    predicted_delta_pct: 6.4,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-mia-1",
-      "Brickell Waterfront Condo",
-      "United States",
-      "Miami",
-      "801 Brickell Bay Dr",
-      920000,
-      IMAGES.miami,
-      "residential",
-      { bedrooms: 2, bathrooms: 2, square_feet: 1250, location_momentum: 74 },
-    ),
-    intelligence_score: 76,
-    outlook: "bullish",
-    predicted_delta_pct: 5.1,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-aus-1",
-      "East Austin Mixed Use",
-      "United States",
-      "Austin",
-      "1400 E 6th St",
-      2100000,
-      IMAGES.austin,
-      "mixed",
-      { bedrooms: null, bathrooms: null, square_feet: 6200, location_momentum: 71 },
-    ),
-    intelligence_score: 72,
-    outlook: "neutral",
-    predicted_delta_pct: 3.2,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-dxb-1",
-      "Marina Gate Tower",
-      "United Arab Emirates",
-      "Dubai",
-      "Dubai Marina Walk",
-      1450000,
-      IMAGES.dubai,
-      "residential",
-      { bedrooms: 3, bathrooms: 3, square_feet: 2100, location_momentum: 80 },
-    ),
-    intelligence_score: 84,
-    outlook: "bullish",
-    predicted_delta_pct: 7.8,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-lon-1",
-      "Shoreditch Workspace",
-      "United Kingdom",
-      "London",
-      "48 Great Eastern St",
-      2750000,
-      IMAGES.london,
-      "commercial",
-      { bedrooms: null, bathrooms: 4, square_feet: 4800, location_momentum: 69 },
-    ),
-    intelligence_score: 68,
-    outlook: "neutral",
-    predicted_delta_pct: 2.4,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-khi-1",
-      "Clifton Seaview",
-      "Pakistan",
-      "Karachi",
-      "Block 5, Clifton",
-      420000,
-      IMAGES.karachi,
-      "residential",
-      { bedrooms: 4, bathrooms: 4, square_feet: 3200, location_momentum: 58 },
-    ),
-    intelligence_score: 64,
-    outlook: "neutral",
-    predicted_delta_pct: 4.0,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-lhe-1",
-      "DHA Phase 6 Villa",
-      "Pakistan",
-      "Lahore",
-      "Street 12, DHA Phase 6",
-      380000,
-      IMAGES.lahore,
-      "residential",
-      { bedrooms: 5, bathrooms: 5, square_feet: 4500, location_momentum: 61 },
-    ),
-    intelligence_score: 70,
-    outlook: "bullish",
-    predicted_delta_pct: 5.5,
-    formula_version: "domzop-re-v1",
-  },
-  {
-    asset: asset(
-      "demo-tor-1",
-      "King West Loft",
-      "Canada",
-      "Toronto",
-      "560 King St W",
-      980000,
-      IMAGES.toronto,
-      "residential",
-      { bedrooms: 1, bathrooms: 1, square_feet: 780, location_momentum: 66 },
-    ),
-    intelligence_score: 67,
-    outlook: "neutral",
-    predicted_delta_pct: 2.9,
-    formula_version: "domzop-re-v1",
-  },
-];
+export const DEMO_PROPERTIES: PropertyCard[] = SPECS.map((spec, i) => ({
+  asset: toAsset(spec, i),
+  intelligence_score: spec.score,
+  outlook: spec.outlook,
+  predicted_delta_pct: spec.delta,
+  formula_version: "domzop-re-v1",
+}));
 
 export function isDemoId(id: string): boolean {
   return id.startsWith("demo-");
@@ -302,6 +216,17 @@ export function demoIntelligence(card: PropertyCard) {
   const outlook = (card.outlook ?? "neutral") as IntelligenceOutlook;
   const score = card.intelligence_score ?? 65;
   const d1 = card.predicted_delta_pct ?? 3;
+  const re = card.asset.real_estate;
+  const deep = buildDeepPropertyIntelligence({
+    assetId: card.asset.id,
+    name: card.asset.name,
+    city: re?.city ?? "Unknown",
+    country: re?.country ?? "Unknown",
+    value,
+    score,
+    outlook,
+  });
+
   return {
     asset: card.asset,
     snapshot: {
@@ -314,51 +239,29 @@ export function demoIntelligence(card: PropertyCard) {
       predicted_value_3y: value * (1 + (d1 * 2.4) / 100),
       predicted_value_5y: value * (1 + (d1 * 3.6) / 100),
       outlook,
-      narrative: `${card.asset.name} sits in ${card.asset.real_estate?.city}. Domzop Formula scores location momentum, yield potential, and nearby projects. Related transit and amenity work may lift marks; competing supply can pressure near-term pricing. This is an internal model — not an appraisal.`,
-      factors: [
-        {
-          key: "location",
-          label: "Location momentum",
-          score: card.asset.real_estate?.location_momentum ?? 60,
-          direction: "tailwind",
-          note: "City / submarket momentum input",
-        },
-        {
-          key: "yield",
-          label: "Income yield",
-          score: 58,
-          direction: "neutral",
-          note: "Rent relative to mark",
-        },
-        {
-          key: "catalysts",
-          label: "Related projects",
-          score: 66,
-          direction: "tailwind",
-          note: "Net lift from signed catalysts",
-        },
-        {
-          key: "risk",
-          label: "Carry & condition",
-          score: 54,
-          direction: "neutral",
-          note: "Taxes, vacancy, condition",
-        },
-      ],
+      narrative: deep.thesis,
+      factors: deep.formula_steps.map((s) => ({
+        key: s.name.toLowerCase().replace(/\s+/g, "_"),
+        label: s.name,
+        score: Math.min(100, s.contribution * 3),
+        direction: s.direction,
+        note: s.detail,
+      })),
       past_json: {
-        events: [
-          { at: "2024-01-15", label: "Estimate", value: value * 0.9 },
-          { at: "2025-06-01", label: "Mark", value: value * 0.96 },
-        ],
+        events: deep.rate_history.slice(-6).map((h) => ({
+          at: h.date,
+          label: "Median mark",
+          value: h.median_sale,
+        })),
       },
       present_json: {
         estimate: value,
-        occupancy: card.asset.real_estate?.occupancy,
+        occupancy: re?.occupancy,
         yield_pct: 4.8,
-        location_momentum: card.asset.real_estate?.location_momentum,
-        condition_score: card.asset.real_estate?.condition_score,
+        location_momentum: re?.location_momentum,
+        condition_score: re?.condition_score,
       },
-      future_json: { outlook },
+      future_json: { outlook, projections: deep.projections },
       generated_at: new Date().toISOString(),
     },
     result: {
@@ -373,5 +276,6 @@ export function demoIntelligence(card: PropertyCard) {
     },
     catalysts,
     valuations: [],
+    deep,
   };
 }

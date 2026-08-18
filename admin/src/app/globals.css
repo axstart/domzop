@@ -58,3 +58,25 @@ body {
   background: #0a0f18;
   font: inherit;
 }
+
+.spring-press {
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease;
+}
+
+.spring-press:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.spring-press:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spring-press,
+  .spring-press:hover,
+  .spring-press:active {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
