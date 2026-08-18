@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Nav } from "@/components/Nav";
 import {
+  ChartCard,
+  CompositionDonut,
+  HalvingBars,
+  IntelligenceWorkflow,
+  MetricPills,
+} from "@/components/charts";
+import {
   allocationPercents,
   formatMoney,
   formatSignedMoney,
@@ -74,18 +81,18 @@ export default function PortfolioPage() {
     <main className="mx-auto max-w-7xl px-6 py-10">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium uppercase tracking-widest text-accent-muted">
+          <p className="text-sm font-medium uppercase tracking-widest text-neon-gold">
             Portfolio manager
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">Holdings</h1>
           <p className="mt-2 max-w-2xl text-gray-400">
-            Track owned domains and real estate: cost basis, marks, and simple performance.
-            Available listings and formula intelligence live under Properties.
+            Book composition, marks, and P/L across domains and real estate. Open Properties for
+            formula intelligence on listings you own or are only eyeing.
           </p>
         </div>
         <Link
           href="/portfolio/new"
-          className="rounded-lg bg-accent px-4 py-2 text-sm hover:bg-accent/80"
+          className="rounded-lg bg-neon-cyan/20 px-4 py-2 text-sm text-neon-cyan shadow-neon hover:bg-neon-cyan/30"
         >
           Add holding
         </Link>
@@ -93,58 +100,80 @@ export default function PortfolioPage() {
 
       <Nav />
 
-      <section className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <SummaryCard label="Total cost" value={formatMoney(summary.total_cost)} />
-        <SummaryCard label="Current value" value={formatMoney(summary.total_value)} accent />
-        <SummaryCard
-          label="Unrealized P/L"
-          value={formatSignedMoney(summary.unrealized_pl)}
-          className={plClass(summary.unrealized_pl)}
-        />
-        <SummaryCard
-          label="Active holdings"
-          value={String(summary.domain_count + summary.real_estate_count)}
-          hint={`${summary.domain_count} domains · ${summary.real_estate_count} real estate`}
+      <section className="mb-6">
+        <MetricPills
+          items={[
+            { label: "COST", value: formatMoney(summary.total_cost), tone: "info" },
+            { label: "MARK", value: formatMoney(summary.total_value), tone: "ok" },
+            {
+              label: "P/L",
+              value: formatSignedMoney(summary.unrealized_pl),
+              tone: (summary.unrealized_pl ?? 0) >= 0 ? "ok" : "bad",
+            },
+            {
+              label: "ACTIVE",
+              value: String(summary.domain_count + summary.real_estate_count),
+              tone: "warn",
+            },
+          ]}
         />
       </section>
 
-      <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
-            Allocation
-          </h2>
-          <p className="text-xs text-gray-500">
-            Owned + listed marks · {summary.owned_count} owned · {summary.listed_count} listed
-            {summary.watchlist_count ? ` · ${summary.watchlist_count} watchlist` : ""}
+      <section className="mb-8 grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          index={1}
+          title="Base composition"
+          accent="lime"
+          caption="Domains vs real estate by current mark — like a composition chart for the book."
+          className="lg:col-span-1"
+        >
+          <CompositionDonut
+            slices={[
+              { label: "Domains", value: summary.domain_value || 0, color: "var(--neon-cyan)" },
+              {
+                label: "Real estate",
+                value: summary.real_estate_value || 0,
+                color: "var(--neon-green)",
+              },
+            ]}
+          />
+        </ChartCard>
+
+        <ChartCard
+          index={2}
+          title="Signal narrowing"
+          accent="purple"
+          caption="Halving view of book concentration — fewer segments as allocation clarifies."
+        >
+          <HalvingBars
+            levels={[
+              100,
+              Math.max(20, alloc.domain || alloc.realEstate || 40),
+              Math.max(12, Math.round((alloc.domain || 50) / 2)),
+              18,
+              10,
+            ]}
+          />
+          <p className="mt-3 text-xs text-gray-400">
+            Domains {alloc.domain}% · Real estate {alloc.realEstate}%
           </p>
-        </div>
-        <div className="h-3 overflow-hidden rounded-full bg-surface-border">
-          <div className="flex h-full">
-            <div
-              className="bg-accent transition-all"
-              style={{ width: `${alloc.domain}%` }}
-              title={`Domains ${alloc.domain}%`}
-            />
-            <div
-              className="bg-emerald-500 transition-all"
-              style={{ width: `${alloc.realEstate}%` }}
-              title={`Real estate ${alloc.realEstate}%`}
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-6 text-sm">
-          <div>
-            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-accent" />
-            Domains {alloc.domain}% · {formatMoney(summary.domain_value)}
-          </div>
-          <div>
-            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            Real estate {alloc.realEstate}% · {formatMoney(summary.real_estate_value)}
-          </div>
-        </div>
+        </ChartCard>
+
+        <ChartCard
+          index={3}
+          title="Book workflow"
+          accent="cyan"
+          caption="From ingest to outlook — the same pipeline that feeds property intelligence."
+        >
+          <IntelligenceWorkflow />
+          <p className="mt-4 text-xs text-gray-500">
+            {summary.owned_count} owned · {summary.listed_count} listed · {summary.watchlist_count}{" "}
+            watchlist
+          </p>
+        </ChartCard>
       </section>
 
-      <div className="rounded-xl border border-surface-border bg-surface-raised">
+      <div className="rounded-2xl border border-surface-border bg-surface-raised/80">
         <div className="flex flex-wrap items-center gap-2 border-b border-surface-border px-5 py-4">
           {TYPE_FILTERS.map((f) => (
             <button
@@ -152,7 +181,7 @@ export default function PortfolioPage() {
               onClick={() => setTypeFilter(f.key)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 typeFilter === f.key
-                  ? "bg-accent text-white"
+                  ? "bg-neon-cyan/20 text-neon-cyan"
                   : "text-gray-400 hover:bg-surface-border hover:text-white"
               }`}
             >
@@ -207,12 +236,12 @@ export default function PortfolioPage() {
                   return (
                     <tr
                       key={a.id}
-                      className="border-b border-surface-border/50 hover:bg-surface/50"
+                      className="border-b border-surface-border/50 hover:bg-black/20"
                     >
                       <td className="px-5 py-3">
                         <Link
                           href={`/portfolio/${a.id}`}
-                          className="font-medium text-accent-muted hover:underline"
+                          className="font-medium text-neon-cyan hover:underline"
                         >
                           {a.name}
                         </Link>
@@ -220,14 +249,11 @@ export default function PortfolioPage() {
                           <p className="mt-0.5">
                             <Link
                               href={`/properties/${a.id}`}
-                              className="text-xs text-accent-muted hover:underline"
+                              className="text-xs text-neon-gold hover:underline"
                             >
-                              Intelligence
+                              Intelligence charts
                             </Link>
                           </p>
-                        )}
-                        {a.candidate_id && (
-                          <p className="mt-0.5 text-xs text-gray-500">Linked from research lab</p>
                         )}
                       </td>
                       <td className="px-5 py-3 capitalize text-gray-400">
@@ -250,7 +276,9 @@ export default function PortfolioPage() {
                           ? a.domain?.registrar || a.domain?.tld || "—"
                           : [a.real_estate?.city, a.real_estate?.region]
                               .filter(Boolean)
-                              .join(", ") || a.real_estate?.property_type || "—"}
+                              .join(", ") ||
+                            a.real_estate?.property_type ||
+                            "—"}
                       </td>
                     </tr>
                   );
@@ -264,41 +292,17 @@ export default function PortfolioPage() {
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  hint,
-  accent,
-  className = "text-gray-100",
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  accent?: boolean;
-  className?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-surface-border bg-surface-raised px-5 py-4">
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${accent ? "text-accent-muted" : className}`}>
-        {value}
-      </p>
-      {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
-    </div>
-  );
-}
-
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    owned: "bg-emerald-500/20 text-emerald-300",
-    listed: "bg-amber-500/20 text-amber-300",
-    watchlist: "bg-blue-500/20 text-blue-300",
-    sold: "bg-purple-500/20 text-purple-300",
-    discarded: "bg-gray-500/20 text-gray-400",
+    owned: "border-neon-green/40 text-neon-green",
+    listed: "border-neon-gold/40 text-neon-gold",
+    watchlist: "border-neon-blue/40 text-neon-blue",
+    sold: "border-neon-purple/40 text-neon-purple",
+    discarded: "border-gray-500/40 text-gray-400",
   };
   return (
     <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs capitalize ${colors[status] ?? ""}`}
+      className={`inline-block rounded-md border px-2 py-0.5 text-xs capitalize ${colors[status] ?? ""}`}
     >
       {status}
     </span>

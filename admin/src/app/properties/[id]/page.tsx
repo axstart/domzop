@@ -1,8 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Nav } from "@/components/Nav";
+import {
+  CatalystNetwork,
+  ChartCard,
+  DensityPathChart,
+  FactorMatrix,
+  HashLookupScore,
+  ImpactTree,
+  IntelligenceWorkflow,
+  MetricPills,
+  TimelineSequence,
+} from "@/components/charts";
 import { formatMoney, plClass } from "@/lib/money";
 import type {
   AssetStatus,
@@ -18,7 +29,7 @@ import type {
 } from "@/lib/portfolio-types";
 
 const inputClass =
-  "rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm text-gray-100";
+  "rounded-lg border border-surface-border bg-black/40 px-3 py-2 text-sm text-gray-100";
 const labelClass = "mb-1 block text-xs uppercase tracking-wide text-gray-500";
 
 type Factor = {
@@ -61,12 +72,6 @@ function adminHeaders() {
     "Content-Type": "application/json",
     "x-admin-secret": process.env.NEXT_PUBLIC_ADMIN_SECRET ?? "",
   };
-}
-
-function outlookClass(outlook: IntelligenceOutlook): string {
-  if (outlook === "bullish") return "text-emerald-400";
-  if (outlook === "bearish") return "text-rose-400";
-  return "text-amber-300";
 }
 
 const CATEGORIES: CatalystCategory[] = [
@@ -173,18 +178,45 @@ export default function PropertyIntelligencePage({ params }: { params: { id: str
     await recompute();
   }
 
+  const pathPoints = useMemo(() => {
+    if (!data) return [];
+    const { asset, snapshot, result, valuations } = data;
+    const base =
+      Number(snapshot.present_json?.estimate) ||
+      asset.current_value ||
+      asset.acquisition_cost ||
+      0;
+    const pastMarks = [...valuations]
+      .sort((a, b) => +new Date(a.valued_at) - +new Date(b.valued_at))
+      .slice(-3)
+      .map((v, i) => ({
+        label: i === 0 ? "Past" : `M${i}`,
+        value: Number(v.value),
+      }));
+    if (pastMarks.length === 0 && asset.acquisition_cost != null) {
+      pastMarks.push({ label: "Acquire", value: Number(asset.acquisition_cost) });
+    }
+    return [
+      ...pastMarks,
+      { label: "Now", value: Number(base) },
+      { label: "1y", value: Number(result.predicted_value.y1 ?? base), future: true },
+      { label: "3y", value: Number(result.predicted_value.y3 ?? base), future: true },
+      { label: "5y", value: Number(result.predicted_value.y5 ?? base), future: true },
+    ].filter((p) => Number.isFinite(p.value) && p.value > 0);
+  }, [data]);
+
   if (error && !data) {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <Nav />
-        <p className="text-rose-400">{error}</p>
+        <p className="text-neon-red">{error}</p>
       </main>
     );
   }
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <Nav />
         <p className="text-gray-500">Loading intelligence…</p>
       </main>
@@ -201,188 +233,250 @@ export default function PropertyIntelligencePage({ params }: { params: { id: str
   const events = Array.isArray(past.events) ? (past.events as Array<Record<string, unknown>>) : [];
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-6 py-10">
       <Nav />
-      <Link href="/properties" className="text-sm text-accent-muted hover:underline">
+      <Link href="/properties" className="text-sm text-neon-cyan hover:underline">
         ← Available properties
       </Link>
 
-      <header className="mt-4 mb-6 flex flex-wrap items-start justify-between gap-4">
+      <header className="mt-4 mb-6 flex flex-wrap items-start justify-between gap-6">
         <div>
-          <p className="text-sm uppercase tracking-widest text-accent-muted">
-            Property intelligence
-          </p>
+          <p className="text-sm uppercase tracking-widest text-neon-gold">Property intelligence</p>
           <h1 className="mt-1 text-3xl font-bold">{asset.name}</h1>
           <p className="mt-1 text-gray-400">
             {[re?.address, re?.city, re?.region, re?.country].filter(Boolean).join(", ")}
           </p>
           <p className="mt-2 text-xs text-gray-500">
-            Formula {snapshot.formula_version} · not an appraisal · scored {new Date(snapshot.generated_at).toLocaleString()}
+            Formula {snapshot.formula_version} · internal model ·{" "}
+            {new Date(snapshot.generated_at).toLocaleString()}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-4xl font-bold text-accent-muted">
-            {Math.round(snapshot.intelligence_score)}
-          </p>
-          <p className={`text-sm capitalize ${outlookClass(snapshot.outlook)}`}>{snapshot.outlook}</p>
-        </div>
+        <HashLookupScore score={snapshot.intelligence_score} label={snapshot.outlook} />
       </header>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          disabled={busy}
-          onClick={() => toggleMode("watchlist")}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            asset.status === "watchlist" ? "bg-blue-600 text-white" : "bg-surface-border text-gray-400"
-          }`}
-        >
-          Watching
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => toggleMode("owned")}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            asset.status === "owned" ? "bg-emerald-600 text-white" : "bg-surface-border text-gray-400"
-          }`}
-        >
-          Owned
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => toggleMode("listed")}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            asset.status === "listed" ? "bg-amber-600 text-white" : "bg-surface-border text-gray-400"
-          }`}
-        >
-          Listed
-        </button>
+        {(["watchlist", "owned", "listed"] as AssetStatus[]).map((s) => (
+          <button
+            key={s}
+            disabled={busy}
+            onClick={() => toggleMode(s)}
+            className={`rounded-lg border px-3 py-1.5 text-sm capitalize ${
+              asset.status === s
+                ? "border-neon-cyan text-neon-cyan shadow-neon"
+                : "border-surface-border text-gray-400"
+            }`}
+          >
+            {s === "watchlist" ? "Watching" : s}
+          </button>
+        ))}
         <button
           disabled={busy}
           onClick={recompute}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm hover:bg-accent/80 disabled:opacity-50"
+          className="rounded-lg bg-neon-cyan/20 px-3 py-1.5 text-sm text-neon-cyan disabled:opacity-50"
         >
-          {busy ? "Updating…" : "Recompute intelligence"}
+          {busy ? "Updating…" : "Recompute"}
         </button>
-        <Link href={`/portfolio/${asset.id}`} className="rounded-lg px-3 py-1.5 text-sm text-gray-400 hover:text-white">
+        <Link
+          href={`/portfolio/${asset.id}`}
+          className="rounded-lg px-3 py-1.5 text-sm text-gray-400 hover:text-white"
+        >
           Edit book
         </Link>
       </div>
 
-      <section className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat
-          label="Present estimate"
-          value={formatMoney((present.estimate as number) ?? asset.current_value, asset.currency)}
-        />
-        <Stat
-          label="1y mark"
-          value={formatMoney(snapshot.predicted_value_1y, asset.currency)}
-          hint={`${result.predicted_delta_pct.y1 > 0 ? "+" : ""}${result.predicted_delta_pct.y1}%`}
-          hintClass={plClass(result.predicted_delta_pct.y1)}
-        />
-        <Stat
-          label="3y mark"
-          value={formatMoney(snapshot.predicted_value_3y, asset.currency)}
-          hint={`${result.predicted_delta_pct.y3 > 0 ? "+" : ""}${result.predicted_delta_pct.y3}%`}
-          hintClass={plClass(result.predicted_delta_pct.y3)}
-        />
-        <Stat
-          label="5y mark"
-          value={formatMoney(snapshot.predicted_value_5y, asset.currency)}
-          hint={`${result.predicted_delta_pct.y5 > 0 ? "+" : ""}${result.predicted_delta_pct.y5}%`}
-          hintClass={plClass(result.predicted_delta_pct.y5)}
+      <section className="mb-6">
+        <MetricPills
+          items={[
+            {
+              label: "NOW",
+              value: formatMoney((present.estimate as number) ?? asset.current_value, asset.currency),
+              tone: "info",
+            },
+            {
+              label: "1Y",
+              value: formatMoney(snapshot.predicted_value_1y, asset.currency),
+              tone: result.predicted_delta_pct.y1 >= 0 ? "ok" : "bad",
+            },
+            {
+              label: "3Y",
+              value: formatMoney(snapshot.predicted_value_3y, asset.currency),
+              tone: result.predicted_delta_pct.y3 >= 0 ? "ok" : "bad",
+            },
+            {
+              label: "5Y",
+              value: formatMoney(snapshot.predicted_value_5y, asset.currency),
+              tone: result.predicted_delta_pct.y5 >= 0 ? "ok" : "bad",
+            },
+            {
+              label: "YIELD",
+              value: result.yield_pct != null ? `${result.yield_pct}%` : "—",
+              tone: "warn",
+            },
+          ]}
         />
       </section>
 
-      <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-        <h2 className="mb-3 font-semibold">Narrative</h2>
+      <section className="mb-8 grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          index={1}
+          title="Density path"
+          accent="cyan"
+          caption="Past marks → present → 1y / 3y / 5y formula path (chromatography-style)."
+          className="lg:col-span-2"
+        >
+          <DensityPathChart points={pathPoints} />
+        </ChartCard>
+        <ChartCard
+          index={2}
+          title="Intelligence workflow"
+          accent="orange"
+          caption="Ingest → mark → catalysts → formula → outlook."
+        >
+          <IntelligenceWorkflow />
+        </ChartCard>
+      </section>
+
+      <section className="mb-8 grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          index={3}
+          title="Related project map"
+          accent="green"
+          caption="Node links from this property to side projects that may lift or pressure value."
+        >
+          <CatalystNetwork
+            centerLabel="Site"
+            nodes={catalysts.map((c) => ({
+              id: c.id,
+              label: c.name,
+              positive: c.impact_direction === "positive",
+            }))}
+          />
+        </ChartCard>
+        <ChartCard
+          index={4}
+          title="Impact tree"
+          accent="pink"
+          caption="Branching scenarios — lift vs pressure counts feeding the formula."
+        >
+          <ImpactTree liftCount={lift.length} pressureCount={pressure.length} />
+        </ChartCard>
+      </section>
+
+      <ChartCard
+        index={5}
+        title="Narrative"
+        accent="gold"
+        caption="AI or heuristic read of the formula factors."
+        className="mb-8"
+      >
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
           {snapshot.narrative}
         </p>
-      </section>
+      </ChartCard>
 
-      <div className="mb-4 flex gap-2">
-        {(["past", "present", "future"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-lg px-4 py-2 text-sm capitalize ${
-              tab === t ? "bg-accent text-white" : "bg-surface-border text-gray-400"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="mb-4">
+        <TimelineSequence active={tab} onSelect={setTab} />
       </div>
 
       {tab === "past" && (
-        <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-          <h2 className="mb-3 font-semibold">Past</h2>
+        <ChartCard index={6} title="Past marks" accent="purple" className="mb-8">
           {events.length === 0 ? (
-            <p className="text-sm text-gray-500">No historical marks yet. Add a valuation to seed the past.</p>
+            <p className="text-sm text-gray-500">
+              No historical marks yet. Add a valuation to seed the past.
+            </p>
           ) : (
             <ul className="space-y-3 text-sm">
               {events.map((e, i) => (
-                <li key={i} className="flex justify-between border-b border-surface-border/40 pb-2">
+                <li
+                  key={i}
+                  className="flex justify-between border-b border-surface-border/40 pb-2"
+                >
                   <span className="text-gray-400">
                     {e.at ? new Date(String(e.at)).toLocaleDateString() : "—"} · {String(e.label)}
                   </span>
-                  <span className="font-mono">{formatMoney(e.value as number, asset.currency)}</span>
+                  <span className="font-mono text-neon-cyan">
+                    {formatMoney(e.value as number, asset.currency)}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
-          {asset.notes && <p className="mt-4 text-sm text-gray-400">{asset.notes}</p>}
-        </section>
+        </ChartCard>
       )}
 
       {tab === "present" && (
-        <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-          <h2 className="mb-3 font-semibold">Present</h2>
+        <ChartCard index={6} title="Present snapshot" accent="cyan" className="mb-8">
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <Row label="Occupancy" value={String(present.occupancy ?? re?.occupancy ?? "—")} />
-            <Row label="Gross yield" value={result.yield_pct != null ? `${result.yield_pct}%` : "—"} />
-            <Row label="Location momentum" value={String(present.location_momentum ?? re?.location_momentum ?? "—")} />
-            <Row label="Condition" value={String(present.condition_score ?? re?.condition_score ?? "—")} />
+            <Row
+              label="Gross yield"
+              value={result.yield_pct != null ? `${result.yield_pct}%` : "—"}
+            />
+            <Row
+              label="Location momentum"
+              value={String(present.location_momentum ?? re?.location_momentum ?? "—")}
+            />
+            <Row
+              label="Condition"
+              value={String(present.condition_score ?? re?.condition_score ?? "—")}
+            />
             <Row label="Monthly rent" value={formatMoney(re?.monthly_rent, asset.currency)} />
             <Row label="Annual taxes" value={formatMoney(re?.annual_taxes, asset.currency)} />
             <Row label="Type" value={re?.property_type ?? "—"} />
             <Row label="Status" value={asset.status} />
           </dl>
-          {re?.market_notes && <p className="mt-4 text-sm text-gray-400">{re.market_notes}</p>}
-        </section>
+        </ChartCard>
       )}
 
       {tab === "future" && (
-        <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-          <h2 className="mb-3 font-semibold">Future</h2>
-          <p className="mb-4 text-sm text-gray-400">
-            Predicted marks use the Domzop Formula path (location, yield, risk, and related
-            projects). This is an internal model, not a market quote.
-          </p>
+        <ChartCard
+          index={6}
+          title="Future marks"
+          accent="gold"
+          caption="Predicted path from Domzop Formula — not a market quote."
+          className="mb-8"
+        >
           <div className="grid gap-3 sm:grid-cols-3">
-            <Stat label="1 year" value={formatMoney(result.predicted_value.y1, asset.currency)} hint={`${result.predicted_delta_pct.y1}%`} />
-            <Stat label="3 years" value={formatMoney(result.predicted_value.y3, asset.currency)} hint={`${result.predicted_delta_pct.y3}%`} />
-            <Stat label="5 years" value={formatMoney(result.predicted_value.y5, asset.currency)} hint={`${result.predicted_delta_pct.y5}%`} />
+            {(
+              [
+                ["1 year", result.predicted_value.y1, result.predicted_delta_pct.y1],
+                ["3 years", result.predicted_value.y3, result.predicted_delta_pct.y3],
+                ["5 years", result.predicted_value.y5, result.predicted_delta_pct.y5],
+              ] as const
+            ).map(([label, value, delta]) => (
+              <div
+                key={label}
+                className="rounded-xl border border-neon-gold/30 bg-black/30 px-4 py-3"
+              >
+                <p className="text-xs uppercase text-neon-gold">{label}</p>
+                <p className="mt-1 text-lg font-semibold">{formatMoney(value, asset.currency)}</p>
+                <p className={`text-xs ${plClass(delta)}`}>
+                  {delta > 0 ? "+" : ""}
+                  {delta}%
+                </p>
+              </div>
+            ))}
           </div>
-        </section>
+        </ChartCard>
       )}
 
-      <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-        <h2 className="mb-1 font-semibold">Projects that may lift / pressure this property</h2>
-        <p className="mb-4 text-xs text-gray-500">
-          Side projects, infrastructure, supply, policy, and amenities enter the formula as
-          signed catalysts.
-        </p>
+      <ChartCard
+        index={7}
+        title="Projects that may lift / pressure"
+        accent="lime"
+        caption="Side projects enter the formula as signed catalysts."
+        className="mb-8"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <h3 className="mb-2 text-sm text-emerald-400">May lift value</h3>
+            <h3 className="mb-2 text-sm text-neon-green">May lift value</h3>
             {lift.length === 0 && <p className="text-sm text-gray-500">None yet.</p>}
             {lift.map((c) => (
               <CatalystRow key={c.id} c={c} onRemove={() => removeCatalyst(c.id)} />
             ))}
           </div>
           <div>
-            <h3 className="mb-2 text-sm text-rose-400">May pressure value</h3>
+            <h3 className="mb-2 text-sm text-neon-red">May pressure value</h3>
             {pressure.length === 0 && <p className="text-sm text-gray-500">None yet.</p>}
             {pressure.map((c) => (
               <CatalystRow key={c.id} c={c} onRemove={() => removeCatalyst(c.id)} />
@@ -427,7 +521,9 @@ export default function PropertyIntelligencePage({ params }: { params: { id: str
           <select
             className={inputClass}
             value={cat.impact_direction}
-            onChange={(e) => setCat({ ...cat, impact_direction: e.target.value as CatalystDirection })}
+            onChange={(e) =>
+              setCat({ ...cat, impact_direction: e.target.value as CatalystDirection })
+            }
           >
             <option value="positive">positive (lift)</option>
             <option value="negative">negative (pressure)</option>
@@ -463,54 +559,23 @@ export default function PropertyIntelligencePage({ params }: { params: { id: str
         <button
           onClick={addCatalyst}
           disabled={busy}
-          className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm hover:bg-emerald-500 disabled:opacity-50"
+          className="mt-4 rounded-lg bg-neon-green/20 px-4 py-2 text-sm text-neon-green hover:bg-neon-green/30 disabled:opacity-50"
         >
           Add related project
         </button>
-      </section>
+      </ChartCard>
 
-      <section className="mb-8 rounded-xl border border-surface-border bg-surface-raised p-5">
-        <h2 className="mb-1 font-semibold">Formula breakdown</h2>
-        <p className="mb-4 text-xs text-gray-500">
-          Factor names and direction only. Mix weights stay internal to {snapshot.formula_version}.
-        </p>
-        <div className="space-y-3">
-          {factors.map((f) => (
-            <div key={f.key}>
-              <div className="mb-1 flex justify-between text-sm">
-                <span>{f.label}</span>
-                <span
-                  className={
-                    f.direction === "tailwind"
-                      ? "text-emerald-400"
-                      : f.direction === "headwind"
-                        ? "text-rose-400"
-                        : "text-gray-400"
-                  }
-                >
-                  {f.direction}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface-border">
-                <div
-                  className={
-                    f.direction === "tailwind"
-                      ? "h-full bg-emerald-500"
-                      : f.direction === "headwind"
-                        ? "h-full bg-rose-500"
-                        : "h-full bg-accent"
-                  }
-                  style={{ width: `${Math.min(100, Math.max(0, f.score))}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">{f.note}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ChartCard
+        index={8}
+        title="Formula matrix"
+        accent="pink"
+        caption="Factor names and direction only — nested-grid style. Mix weights stay internal."
+        className="mb-8"
+      >
+        <FactorMatrix factors={factors} />
+      </ChartCard>
 
-      <section className="rounded-xl border border-surface-border bg-surface-raised p-5">
-        <h2 className="mb-4 font-semibold">Add a valuation mark</h2>
+      <ChartCard index={9} title="Add a valuation mark" accent="blue">
         <div className="grid gap-3 sm:grid-cols-3">
           <input
             type="number"
@@ -538,41 +603,21 @@ export default function PropertyIntelligencePage({ params }: { params: { id: str
         <button
           onClick={addMark}
           disabled={busy}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm hover:bg-accent/80 disabled:opacity-50"
+          className="mt-4 rounded-lg bg-neon-cyan/20 px-4 py-2 text-sm text-neon-cyan disabled:opacity-50"
         >
           Record mark
         </button>
         {valuations.length > 0 && (
           <p className="mt-3 text-xs text-gray-500">{valuations.length} mark(s) on file.</p>
         )}
-      </section>
+      </ChartCard>
     </main>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  hintClass,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  hintClass?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-      <p className="text-xs uppercase text-gray-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
-      {hint && <p className={`text-xs ${hintClass ?? "text-gray-500"}`}>{hint}</p>}
-    </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4">
+    <div className="flex justify-between gap-4 rounded-lg border border-surface-border/60 px-3 py-2">
       <dt className="text-gray-500">{label}</dt>
       <dd className="capitalize text-gray-200">{value}</dd>
     </div>
@@ -581,7 +626,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function CatalystRow({ c, onRemove }: { c: PropertyCatalyst; onRemove: () => void }) {
   return (
-    <div className="mb-2 rounded-lg border border-surface-border/80 p-3 text-sm">
+    <div className="mb-2 rounded-lg border border-surface-border/80 bg-black/20 p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-medium">{c.name}</p>
@@ -590,7 +635,7 @@ function CatalystRow({ c, onRemove }: { c: PropertyCatalyst; onRemove: () => voi
           </p>
           {c.description && <p className="mt-1 text-xs text-gray-400">{c.description}</p>}
         </div>
-        <button onClick={onRemove} className="text-xs text-gray-500 hover:text-rose-400">
+        <button onClick={onRemove} className="text-xs text-gray-500 hover:text-neon-red">
           Remove
         </button>
       </div>
